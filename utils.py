@@ -198,7 +198,7 @@ def parse_constraints(yaml_data):
     Parse the YAML data and extract constraints into dictionaries.
     """
     # Extract intervals, days, subjects, professors, and rooms
-    intervals = yaml_data[INTERVALE]
+    intervals = list(map(eval, yaml_data[INTERVALE]))
     days = yaml_data[ZILE]
     subjects = yaml_data[MATERII]
     professors = yaml_data[PROFESORI]
@@ -240,11 +240,16 @@ def parse_constraints(yaml_data):
         professor_preferred[professor] = preferred
         teacher_availability[professor] = availability
 
+    # parse professor subjects
+    teacher_subjects = {}
+    for professor, info in professors.items():
+        teacher_subjects[professor] = info['Materii']
+
     # Parse room capacities and subjects
     for room, info in rooms.items():
         room_capacity_and_subjects[room] = (info['Capacitate'], info['Materii'])
 
-    return intervals, days, subjects, teacher_availability, room_capacity_and_subjects, professor_preferred
+    return intervals, days, subjects, teacher_availability, room_capacity_and_subjects, professor_preferred, teacher_subjects
 
 
 def split_intervals(non_preferred):
@@ -262,50 +267,28 @@ def split_intervals(non_preferred):
 
 
 if __name__ == '__main__':
-    import numpy as np
+    filename = f'inputs/orar_mic_exact.yaml'
 
-    # Definirea datelor din orar
-    days = ['Luni', 'Marti', 'Miercuri', 'Joi', 'Vineri']
-    intervals = [(8, 10), (10, 12), (12, 14), (14, 16), (16, 18), (18, 20)]
-    subjects = {'PA': 330, 'PCom': 330, 'PL': 300}
+    timetable_specs = read_yaml_file(filename)
 
-    # Definirea tabloului NumPy
-    timetable_np = np.empty((len(days), len(intervals)), dtype=object)
+    acces_yaml_attributes(timetable_specs)
 
-    # Umplerea tabloului cu datele orarului
-    for i, day in enumerate(days):
-        for j, interval in enumerate(intervals):
-            timetable_np[i, j] = {
-                'profesor': 'Nume profesor',
-                'materie': 'Nume materie'
-                # alte informații relevante pentru intervalul de timp
-            }
+    (intervals, days, subjects, teacher_availability, room_capacity_and_subjects,
+     professor_preferred, teacher_subjects) = parse_constraints(timetable_specs)
 
-    # Afișarea tabloului NumPy
-    print(timetable_np)
-
-    # Apelul functiei pretty_print_timetable
-
-#     filename = f'inputs/orar_mic_exact.yaml'
-#
-    # timetable_specs = read_yaml_file(filename)
-#
-#     acces_yaml_attributes(timetable_specs)
-#
-#     (intervals, days, subjects, teacher_availability, room_capacity_and_subjects,
-#      professor_preferred) = parse_constraints(timetable_specs)
-#
-#     print('Intervalele sunt:', intervals)
-#     print()
-#     print('Zilele sunt:', days)
-#     print()
-#     print('Materiile sunt:', subjects)
-#     print()
-#     print('Disponibilitatea profesorilor este:', teacher_availability)
-#     print()
-#     print('Capacitatile salilor sunt:', room_capacity_and_subjects)
-#     print()
-#     print('Preferintele profesorilor sunt:', professor_preferred)
+    print('Intervalele sunt:', intervals)
+    print()
+    print('Zilele sunt:', days)
+    print()
+    print('Materiile sunt:', subjects)
+    print()
+    print('Disponibilitatea profesorilor este:', teacher_availability)
+    print()
+    print('Capacitatile salilor sunt:', room_capacity_and_subjects)
+    print()
+    print('Preferintele profesorilor sunt:', professor_preferred)
+    print()
+    print('Materiile predate de profesori sunt:', teacher_subjects)
 
 
 
