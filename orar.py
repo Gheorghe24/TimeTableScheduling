@@ -43,7 +43,8 @@ Luni → profesorul preferă să predea Luni
 
 class TimetableState:
     def __init__(self, intervals, days, subjects, teacher_availability,
-                 room_capacity_and_subjects, teacher_subjects, schedule=None):
+                 room_capacity_and_subjects, teacher_subjects,
+                 teacher_class_taken, schedule=None):
         self.intervals = intervals
         self.days = days
         self.subjects = subjects
@@ -51,6 +52,7 @@ class TimetableState:
         self.room_capacity_and_subjects = room_capacity_and_subjects
         self.teacher_subjects = teacher_subjects
         self.rooms = list(room_capacity_and_subjects.keys())
+        self.teacher_class_taken = teacher_class_taken
         self.schedule = schedule if schedule is not None else self.initialize_schedule()
 
     def initialize_schedule(self):
@@ -70,13 +72,15 @@ class TimetableState:
         print("Subjects: ", self.subjects)
         return all(value == 0 for value in self.subjects.values())
 
-    def assign_subject_teacher(self, room, day, interval, subject, teacher):
-        print("Assigning subject to teacher in room: ", room, day, interval, subject, teacher)
+    def assign_subject_teacher(self, room, day, interval, subject, teacher, num_of_students):
+        print("Assigning subject to teacher in room: ", room, day, interval, subject, teacher, num_of_students)
         self.schedule[day][interval][room] = (teacher, subject)
         print("Schedule: ", self.schedule)
-        self.subjects[subject] -= self.room_capacity_and_subjects[room][0]
+        self.subjects[subject] -= num_of_students
         # remove interval from teacher availability
         self.teacher_availability[teacher][day].remove(interval)
+        # remove interval from teacher class taken
+        self.teacher_class_taken[teacher] += 1
 
     def get_neighbors(self):
         neighbors = []  # list of timetable states
@@ -94,30 +98,37 @@ class TimetableState:
                         if self.schedule[day][interval][room] is not None:
                             continue
 
+                        # check if the subject is available
+                        if self.subjects[subject] == 0:
+                            continue
+
                         # check if the subject can be added to the room
                         print("Room capacity: ", self.room_capacity_and_subjects[room][0])
                         print("Subject capacity: ", self.subjects[subject])
-                        if self.room_capacity_and_subjects[room][0] <= self.subjects[subject]:
-                            # check if the teacher is available
-                            teacher = None
-                            for teacher in self.teacher_availability:
-                                # if teacher teaches the subject and is available
-                                if subject in self.teacher_subjects[teacher] and interval in self.teacher_availability[teacher][day]:
-                                    teacher = teacher
-                                    break
-                            print("Teacher: ", teacher)
-                            print("Teacher availability: ", self.teacher_availability[teacher])
-                            if teacher is not None:
-                                # check if the teacher is available to teach the subject
-                                if (teacher in self.teacher_availability and
-                                        subject in self.teacher_subjects[teacher]):
-                                    # assign the subject to the teacher
-                                    self.assign_subject_teacher(room, day, interval, subject, teacher)
-                                    new_state = TimetableState(self.intervals, self.days, self.subjects,
-                                                               self.teacher_availability,
-                                                               self.room_capacity_and_subjects, self.teacher_subjects,
-                                                               self.schedule)
-                                    neighbors.append(new_state)
+                        # check if the teacher is available
+                        teacher = None
+                        for teacher in self.teacher_availability:
+                            # if teacher teaches the subject and is available(has less than 7 classes taken)
+                            if subject in self.teacher_subjects[teacher] and interval in self.teacher_availability[teacher][day] and self.teacher_class_taken[teacher] < 7:
+                                teacher = teacher
+                                break
+                        print("Teacher: ", teacher)
+                        print("Teacher availability: ", self.teacher_availability[teacher])
+                        if teacher is not None:
+                            # check if the teacher is available to teach the subject
+                            if (teacher in self.teacher_availability and
+                                    subject in self.teacher_subjects[teacher]):
+                                # assign the subject to the teacher
+                                num_of_students = self.room_capacity_and_subjects[room][0] if self.room_capacity_and_subjects[room][0] < self.subjects[subject] else self.subjects[subject]
+                                self.assign_subject_teacher(room, day, interval, subject, teacher, num_of_students)
+                                new_state = TimetableState(self.intervals, self.days, self.subjects,
+                                                           self.teacher_availability,
+                                                           self.room_capacity_and_subjects,
+                                                           self.teacher_subjects,
+                                                           self.teacher_class_taken,
+                                                           self.schedule)
+                                neighbors.append(new_state)
+
 
         return neighbors
 
@@ -212,8 +223,13 @@ def main():
      # {'Alexandru Popa': ['PA', 'PCom'], 'Andrei Ilie': ['PA', 'PL'], 'Andrei Ionescu': ['PCom'], 'Andrei Moldovan': ['PA', 'PL'], 'Cristina Dinu': ['PL', 'PA'], 'Dumitru Moldovan': ['PCom', 'PL'], 'Elena Ionescu': ['PCom', 'PL'], 'Ioana Scarlatescu': ['PL', 'PCom'], 'Madalina Dinu': ['PL'], 'Madalina Gheorghe': ['PL'], 'Maria Ilie': ['PCom', 'PA'], 'Petru Chiriac': ['PCom', 'PL'], 'Roxana Ilie': ['PA', 'PL', 'PCom']}
      ) = parse_constraints(timetable_specs)
 
+    # for every teacher create a dictionary with the name of the teacher and the number of intervals taken
+    # a teacher can take a maximum of 7 intervals per week
+    teacher_class_taken = {teacher: 0 for teacher in teacher_availability}
+
     initial_state = TimetableState(intervals, days, subjects, teacher_availability,
-                                   room_capacity_and_subjects, teacher_subjects)
+                                   room_capacity_and_subjects, teacher_subjects,
+                                   teacher_class_taken)
 
     # Run the selected algorithm
     if algorithm == "astar":
@@ -228,6 +244,7 @@ def main():
     if final_state is not None:
         print("Solution found:")
         print(final_state.schedule)
+        print(final_state.teacher_class_taken)
         print(pretty_print_timetable(final_state.schedule, input_file))
     else:
         print("No solution found.")
